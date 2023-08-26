@@ -1,9 +1,14 @@
 //jshint esversion:6
+const md5 = require('md5');
+require('dotenv').config()
+// console.log(process.env.SECRET)
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
  
 const app = express();
  
@@ -19,9 +24,9 @@ const userSchema = new mongoose.Schema({
     email : String,
     password : String
 });
- 
-const secret = "littleSecret.";
-userSchema.plugin(encrypt, {secret: secret, encryptedFields: ["password"]});
+
+
+userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
 
 const User = mongoose.model("User", userSchema);
@@ -40,9 +45,11 @@ app.route("/login")
  
     User.findOne({email : username })
     .then((foundUser)=> {
-        if(foundUser.password === password){
-            res.render("secrets");
-        }
+            bcrypt.compare(password, foundUser.password).then(function(result) {
+                 if(result === true){
+                    res.render("secrets");
+                 }
+            });
     })
     .catch((err)=> console.log(err));
 })
@@ -53,13 +60,17 @@ app.route("/register")
 })
  
 .post((req,res)=>{
-    const newUser = new User({
-        email : req.body.username,
-        password : req.body.password
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        const newUser = new User({
+            email : req.body.username,
+            password : hash
+        });
+        newUser.save()
+        .then(()=> res.render("secrets"))
+        .catch((err)=> console.log(err))
     });
-    newUser.save()
-    .then(()=> res.render("secrets"))
-    .catch((err)=> console.log(err))
+    
 });
  
 app.listen(3000, function(req,res){
