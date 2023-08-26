@@ -1,4 +1,5 @@
 //jshint esversion:6
+const md5 = require('md5');
 require('dotenv').config()
 // console.log(process.env.SECRET)
 const express = require("express");
@@ -21,7 +22,7 @@ const userSchema = new mongoose.Schema({
     email : String,
     password : String
 });
- 
+
 
 userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
@@ -38,7 +39,7 @@ app.route("/login")
 })
 .post((req,res)=>{
     const username = req.body.username;
-    const password = req.body.password;
+    const password = md5(req.body.password);
  
     User.findOne({email : username })
     .then((foundUser)=> {
@@ -57,7 +58,7 @@ app.route("/register")
 .post((req,res)=>{
     const newUser = new User({
         email : req.body.username,
-        password : req.body.password
+        password : md5(req.body.password)
     });
     newUser.save()
     .then(()=> res.render("secrets"))
