@@ -1,78 +1,116 @@
 //jshint esversion:6
-const md5 = require('md5');
-require('dotenv').config()
-// console.log(process.env.SECRET)
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
-const bcrypt = require('bcrypt');
-const saltRounds = 10;
+const session = require("express-session");
+const passport = require("passport");
+const passportLocalMongoose = require("passport-local-mongoose");
  
 const app = express();
  
-app.set("view engine", "ejs");
 app.use(express.static("public"));
-app.use(bodyParser.urlencoded({
-    extended : true
-}));
+app.set("view engine", "ejs");
+app.use(bodyParser.urlencoded({ extended: true }));
  
-mongoose.connect("mongodb://0.0.0.0:27017/userDB");
+// app use session package
+app.use(
+  session({
+    secret: "Our little secret.",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
  
+app.use(passport.initialize());
+app.use(passport.session());
+ 
+// DB connection
+mongoose.connect("mongodb://127.0.0.1:27017/userDB", { useNewUrlParser: true });
+ 
+// Schema
 const userSchema = new mongoose.Schema({
-    email : String,
-    password : String
+  email: String,
+  password: String,
 });
-
-
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
-
-
+ 
+userSchema.plugin(passportLocalMongoose);
+ 
+// Model
 const User = mongoose.model("User", userSchema);
  
-app.get("/", (req,res)=>{
-    res.render("home");
+passport.use(User.createStrategy());
+ 
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+ 
+// GET REQUESTS
+app.get("/", function (req, res) {
+  res.render("home");
 });
  
-app.route("/login")
-.get((req,res)=>{
-    res.render("login");
-})
-.post((req,res)=>{
-    const username = req.body.username;
-    const password = req.body.password;
+app.get("/login", function (req, res) {
+  res.render("login");
+});
  
-    User.findOne({email : username })
-    .then((foundUser)=> {
-            bcrypt.compare(password, foundUser.password).then(function(result) {
-                 if(result === true){
-                    res.render("secrets");
-                 }
-            });
-    })
-    .catch((err)=> console.log(err));
-})
+app.get("/register", function (req, res) {
+  res.render("register");
+});
  
-app.route("/register")
-.get((req,res)=>{
-    res.render("register");
-})
+app.get("/secrets", function (req, res) {
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
+});
  
-.post((req,res)=>{
-    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-        // Store hash in your password DB.
-        const newUser = new User({
-            email : req.body.username,
-            password : hash
+app.get("/logout", function (req, res, next) {
+  req.logout(function (err) {
+    if (err) {
+      return next(err);
+    } else {
+      res.redirect("/");
+    }
+  });
+});
+ 
+// POST REQUESTS
+app.post("/register", function (req, res) {
+  User.register(
+    { username: req.body.username },
+    req.body.password,
+    function (err, user) {
+      if (err) {
+        console.log(err);
+        res.redirect("/register");
+      } else {
+        passport.authenticate("local")(req, res, function () {
+          res.redirect("/secrets");
         });
-        newUser.save()
-        .then(()=> res.render("secrets"))
-        .catch((err)=> console.log(err))
-    });
-    
+      }
+    }
+  );
 });
  
-app.listen(3000, function(req,res){
-    console.log("Server Running at Port 3000");
+app.post("/login", function (req, res) {
+  const user = new User({
+    username: req.body.username,
+    password: req.body.password,
+  });
+ 
+  req.login(user, function (err) {
+    if (err) {
+      console.log(err);
+    } else {
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/secrets");
+      });
+    }
+  });
+});
+ 
+app.listen(3000, function () {
+  console.log("Server started on port 3000");
 });
