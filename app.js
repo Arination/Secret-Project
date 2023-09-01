@@ -171,27 +171,31 @@ app.post("/login", function (req, res) {
   });
 });
  
-app.post("/submit", function(req, res){
-  const sec = req.body.secret;
-  const usersecid = req.user.id;
-  User.findById(usersecid)
+app.post("/submit", function(req, res) {
+  const secret = req.body.secret;
+  const userSecretId = req.user.id;
+
+  User.findById(userSecretId)
     .then(user => {
       if (user) {
-        user.secret = sec;
-        return user.save(); // Return the promise here
+        user.secret = secret;
+        user.save() // No return statement here
+          .then(() => {
+            res.redirect("/secrets");
+          })
+          .catch(err => {
+            console.error(err);
+            res.redirect("/secrets"); // Handle the error appropriately
+          });
       } else {
-        throw new Error('User not found'); // Throw an error to handle it in the catch block
+        throw new Error('User not found');
       }
-    })
-    .then(() => {
-      res.redirect("/secrets");
     })
     .catch(err => {
       console.error(err);
-      res.redirect("/secrets"); // Redirect or handle the error as needed
+      res.redirect("/secrets"); // Handle the error appropriately
     });
 });
-
 
 
 app.listen(3000, function () {
