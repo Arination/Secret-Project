@@ -129,4 +129,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-.txt
+#Ignoring the code test text files
+*.txt
